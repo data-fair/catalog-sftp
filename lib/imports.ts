@@ -1,127 +1,101 @@
-import type { ListContext, DownloadResourceContext, Folder, Resource } from '@data-fair/lib-common-types/catalog/index.js'
-import type { MockConfig } from '#types'
+import type { SFTPConfig } from '#types'
 import type capabilities from './capabilities.ts'
+import type { ListContext, Folder, Resource } from '@data-fair/lib-common-types/catalog/index.js'
+import { type Config, NodeSSH } from 'node-ssh'
+/**
+ * Prepares a list of files and folders from the SFTP directory listing.
+ *
+ * @param list - The array of file objects returned by the SFTP `readdir` method.
+ * @param path - The current directory path.
+ * @returns An array of `Folder` or `Resource` objects representing the files and folders.
+ */
+const prepareFiles = (list: any[], path: string): (Folder | Resource)[] => {
+  return list.map((file) => {
+    const pointPos = file.filename.lastIndexOf('.')
+    return {
+      id: path + '/' + file.filename,
+      title: file.filename,
+      type: (file.longname.charAt(0) === 'd') ? 'folder' : 'resource',
+      url: path + '/' + file.filename,
+      format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1))
+    }
+  })
+}
 
-export const list = async ({ params }: ListContext<MockConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
-  await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate a delay for the mock plugin
+/**
+ * Lists the contents of a folder on an SFTP server.
+ *
+ * @param context - The context containing catalog configuration and parameters.
+ * @returns An object containing the count of items, the list of results (folders and resources), and the path as an array of folders.
+ * @throws Will throw an error if the connection configuration is invalid or not supported.
+ */
+export const list = async ({ catalogConfig, params }: ListContext<SFTPConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
+  const ssh = new NodeSSH()
 
-  const clone = (await import('@data-fair/lib-utils/clone.js')).default
-  const tree = clone((await import('./resources.ts')).default)
-
-  /**
-   * Extracts folders and resources for a given parent/folder ID
-   * @param resources - The resources object containing folders and resources
-   * @param targetId - The parent ID for folders or folder ID for resources (null for root level)
-   * @returns Array of folders and resources matching the criteria
-   */
-  const getFoldersAndResources = (targetId: string | null): (Folder | Resource)[] => {
-    const folders = Object.keys(tree.folders).reduce((acc: Folder[], key) => {
-      if (tree.folders[key].parentId === targetId) {
-        acc.push({
-          id: key,
-          title: tree.folders[key].title,
-          type: 'folder'
-        })
-      }
-      return acc
-    }, [])
-
-    const folderResources = Object.keys(tree.resources).reduce((acc: Resource[], key) => {
-      if (tree.resources[key].folderId === targetId) {
-        // Exclude folderId from the resource object
-        const { folderId, ...rest } = tree.resources[key]
-
-        // Add the resource to the result with type 'resource'
-        acc.push({
-          id: key,
-          ...rest,
-          type: 'resource'
-        })
-      }
-      return acc
-    }, [])
-
-    return [...folders, ...folderResources]
+  const paramsConnection: Config = {
+    host: catalogConfig.url,
+    username: catalogConfig.login,
+    port: catalogConfig.port
+  }
+  if (catalogConfig.connectionKey.key === 'sshKey') {
+    paramsConnection.privateKey = catalogConfig.connectionKey.sshKey
+  } else if (catalogConfig.connectionKey.key === 'password') {
+    paramsConnection.password = catalogConfig.connectionKey.password
+  } else {
+    throw new Error('format non pris en charge')
   }
 
-  const path: Folder[] = []
-  const res: (Folder | Resource)[] = getFoldersAndResources(params.currentFolderId ?? null)
+  try {
+    await ssh.connect(paramsConnection)
+  } catch (err) {
+    console.error(err)
+    throw new Error('Configuration invalide')
+  }
 
-  // Get path to current folder if specified
-  if (params.currentFolderId) {
-    // Get current folder
-    const currentFolder = tree.folders[params.currentFolderId]
-    if (!currentFolder) throw new Error(`Folder with ID ${params.currentFolderId} not found`)
+  const clientSFTP = await ssh.requestSFTP()
+  const path = params.currentFolderId ?? '.'
+  console.log(path)
+  const files: any[] = await new Promise((resolve, reject) => {
+    clientSFTP.readdir(path, (err: any, list: any) => {
+      if (err) return reject(err)
+      resolve(list)
+    })
+  })
 
-    // Get path to current folder (parents folders)
-    let parentId = currentFolder.parentId
-    while (parentId !== null) {
-      const parentFolder = tree.folders[parentId]
-      if (!parentFolder) throw new Error(`Parent folder with ID ${parentId} not found`)
+  const results = prepareFiles(files, path)
 
-      // Add the parent to the start of the list to avoid reversing the path later
-      path.unshift({
-        id: parentId,
-        title: parentFolder.title,
-        type: 'folder'
-      })
-      parentId = parentFolder.parentId
-    }
-
-    // Add the current folder to the path
-    path.push({
-      id: params.currentFolderId,
-      title: currentFolder.title,
+  const pathFolder: Folder[] = []
+  let parentId: string | undefined = (params.currentFolderId?.indexOf('./')) === -1 ? params.currentFolderId : params.currentFolderId?.substring(params.currentFolderId.indexOf('./') + 2)
+  while (parentId && parentId !== '') {
+    pathFolder.unshift({
+      id: parentId,
+      title: parentId.substring(parentId.lastIndexOf('/') + 1),
       type: 'folder'
     })
+    parentId = parentId.substring(0, parentId.lastIndexOf('/'))
   }
 
   return {
-    count: res.length,
-    results: res,
-    path
+    count: results.length,
+    results,
+    path: pathFolder
   }
 }
 
-export const getResource = async (catalogConfig: MockConfig, resourceId: string): Promise<Resource> => {
-  await new Promise(resolve => setTimeout(resolve, 1000))
-
-  const clone = (await import('@data-fair/lib-utils/clone.js')).default
-  const resources = clone((await import('./resources.ts')).default)
-
-  const resource = resources.resources[resourceId]
-  if (!resource) { throw new Error(`Resource with ID ${resourceId} not found`) }
-  const { folderId, ...rest } = resource
-
+/**
+ * Retrieves metadata for a specific resource (file) on the SFTP server.
+ *
+ * @param catalogConfig - The SFTP configuration object.
+ * @param resourceId - The identifier (path) of the resource.
+ * @returns A `Resource` object representing the file.
+ */
+export const getResource = async (catalogConfig: SFTPConfig, resourceId: string): Promise<Resource> => {
+  const pointPos = resourceId.lastIndexOf('.')
   return {
     id: resourceId,
-    ...rest,
-    type: 'resource'
+    title: resourceId.substring(resourceId.lastIndexOf('/') + 1),
+    type: 'resource',
+    format: (pointPos === -1) ? '' : (resourceId.substring(pointPos + 1)),
+    url: resourceId
   }
-}
-
-export const downloadResource = async ({ catalogConfig, resourceId, importConfig, tmpDir }: DownloadResourceContext<MockConfig>) => {
-  await new Promise(resolve => setTimeout(resolve, 1000))
-
-  // Validate the importConfig
-  const { returnValid } = await import('#type/importConfig/index.ts')
-  returnValid(importConfig)
-
-  // First check if the resource exists
-  const resource = await getResource(catalogConfig, resourceId)
-  if (!resource) return undefined
-
-  // Import necessary modules dynamically
-  const fs = await import('node:fs/promises')
-  const path = await import('node:path')
-
-  // Simulate downloading by copying a dummy file with limited rows
-  const sourceFile = path.join(import.meta.dirname, 'jdd-mock.csv')
-  const destFile = path.join(tmpDir, 'jdd-mock.csv')
-  const data = await fs.readFile(sourceFile, 'utf8')
-
-  // Limit the number of rows to importConfig.nbRows (Header excluded)
-  const lines = data.split('\n').slice(1, importConfig.nbRows).join('\n')
-  await fs.writeFile(destFile, lines, 'utf8')
-  return destFile
 }

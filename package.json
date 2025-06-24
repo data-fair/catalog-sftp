@@ -1,7 +1,7 @@
 {
-  "name": "@data-fair/catalog-mock",
-  "description": "A simple mock plugin for the Data Fair catalogs service.",
-  "version": "0.2.1",
+  "name": "@data-fair/catalog-sftp",
+  "description": "SFTP plugin for the Data Fair catalogs service.",
+  "version": "0.0.0",
   "main": "index.ts",
   "type": "module",
   "scripts": {
@@ -42,9 +42,12 @@
     "@data-fair/lib-types-builder": "^1.8.0",
     "@types/debug": "^4.1.12",
     "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.0.3",
+    "@types/ssh2": "^1.15.5",
     "eslint": "^9.25.1",
     "husky": "^9.1.7",
     "neostandard": "^0.12.1",
+    "node-ssh": "^13.2.1",
     "typescript": "^5.8.3"
   },
   "relativeDependencies": {

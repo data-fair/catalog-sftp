@@ -6,8 +6,4 @@
  */
 export default [
   'import' as const,
-  'search' as const,
-  'importConfig' as const,
-  'publishDataset' as const,
-  'deletePublication' as const
 ]

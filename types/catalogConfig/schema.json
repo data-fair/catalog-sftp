@@ -5,26 +5,90 @@
     "validate",
     "schema"
   ],
-  "title": "MockConfig",
+  "title": "SFTPConfig",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "url"
+    "url",
+    "port",
+    "connectionKey",
+    "login"
   ],
   "properties": {
     "url": {
       "type": "string",
-      "title": "URL",
-      "description": "The url of the catalog",
+      "title": "Adresse de l'hôte",
+      "description": "The host adress",
       "x-i18n-description": {
-        "fr": "L'URL de l'API du catalogue"
+        "fr": "L'adresse de l'hôte du catalogue (veuillez vous référez à la documentation technique du catalogue)"
       },
-      "pattern": "^https?://.*[^/]$",
-      "errorMessage": "The URL must start with http:// or https:// and must not end with `/`.",
-      "x-i18n-errorMessage": {
-        "fr": "L'URL doit commencer par http:// ou https:// et ne pas se terminer par `/`."
+      "examples": [
+        "exemple-d-hote.fr"
+      ]
+    },
+    "port": {
+      "type": "integer",
+      "title": "port",
+      "description": "The port of the catalog",
+      "x-i18n-description": {
+        "fr": "Le port de l'API du catalogue (veuillez vous référez à la documentation technique du catalogue)"
       },
-      "examples": ["https://example.com"]
+      "default": 22
+    },
+    "login": {
+      "type": "string",
+      "title": "Identifiant",
+      "description": "The user login",
+      "x-i18n-description": {
+        "fr": "L'identifiant (login) utilisé pour accéder au catalogue"
+      }
+    },
+    "connectionKey": {
+      "type": "object",
+      "title": "Mode de connexion",
+      "description": "Le mode de connexion à utiliser (Mot de passe, clé SSH)",
+      "oneOfLayout": {
+        "label": "Chosir un mode de connexion"
+      },
+      "oneOf": [
+        {
+          "title": "Mot de Passe",
+          "required": [
+            "password"
+          ],
+          "properties": {
+            "password": {
+              "type": "string",
+              "description": "Enter your account password for the remote server",
+              "x-i18n-description": {
+                "fr": "Renseigner le mot de passe associé à votre compte sur le serveur distant"
+              }
+            },
+            "key": {
+              "const": "password"
+            }
+          }
+        },
+        {
+          "title": "Clé SHH",
+          "required": [
+            "sshKey"
+          ],
+          "properties": {
+            "key": {
+              "const": "sshKey"
+            },
+            "sshKey": {
+              "type": "string",
+              "layout": "textarea",
+              "description": "Enter your ssh key",
+              "x-i18n-description": {
+                "fr": "Renseigner le votre clé SSH privée"
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }
