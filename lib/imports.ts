@@ -1,7 +1,25 @@
 import type { SFTPConfig } from '#types'
+import type { SFTPWrapper } from 'ssh2'
 import type capabilities from './capabilities.ts'
 import type { ListContext, Folder, Resource } from '@data-fair/lib-common-types/catalog/index.js'
 import { type Config, NodeSSH } from 'node-ssh'
+
+/**
+ * Stores the most recently used SFTP configuration.
+ * This variable holds the last SFTPConfig object that was used,
+ * allowing for reuse or reference in subsequent SFTP operations.
+ */
+let lastConfig: SFTPConfig
+
+/**
+ * Store the ssh instance for SFTP operations.
+ */
+const ssh = new NodeSSH()
+/**
+ * SFTP client instance used for managing SFTP operations.
+ */
+let clientSFTP: SFTPWrapper
+
 /**
  * Prepares a list of files and folders from the SFTP directory listing.
  *
@@ -30,34 +48,39 @@ const prepareFiles = (list: any[], path: string): (Folder | Resource)[] => {
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
 export const list = async ({ catalogConfig, params }: ListContext<SFTPConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
-  const ssh = new NodeSSH()
+  if (!(lastConfig && ssh && clientSFTP) || JSON.stringify(lastConfig) !== JSON.stringify(catalogConfig)) {
+    lastConfig = catalogConfig
+    const paramsConnection: Config = {
+      host: catalogConfig.url,
+      username: catalogConfig.login,
+      port: catalogConfig.port
+    }
+    if (catalogConfig.connectionKey.key === 'sshKey') {
+      paramsConnection.privateKey = catalogConfig.connectionKey.sshKey
+    } else if (catalogConfig.connectionKey.key === 'password') {
+      paramsConnection.password = catalogConfig.connectionKey.password
+    } else {
+      throw new Error('format non pris en charge')
+    }
 
-  const paramsConnection: Config = {
-    host: catalogConfig.url,
-    username: catalogConfig.login,
-    port: catalogConfig.port
+    try {
+      await ssh.connect(paramsConnection)
+    } catch (err) {
+      console.error(err)
+      throw new Error('Configuration invalide')
+    }
+    clientSFTP = await ssh.requestSFTP()
   }
-  if (catalogConfig.connectionKey.key === 'sshKey') {
-    paramsConnection.privateKey = catalogConfig.connectionKey.sshKey
-  } else if (catalogConfig.connectionKey.key === 'password') {
-    paramsConnection.password = catalogConfig.connectionKey.password
-  } else {
-    throw new Error('format non pris en charge')
-  }
-
-  try {
-    await ssh.connect(paramsConnection)
-  } catch (err) {
-    console.error(err)
-    throw new Error('Configuration invalide')
-  }
-
-  const clientSFTP = await ssh.requestSFTP()
   const path = params.currentFolderId ?? '.'
-  console.log(path)
   const files: any[] = await new Promise((resolve, reject) => {
+    if (!clientSFTP) {
+      throw new Error('Configuration invalide')
+    }
     clientSFTP.readdir(path, (err: any, list: any) => {
-      if (err) return reject(err)
+      if (err) {
+        console.error('Error reading directory:', err)
+        return reject(err)
+      }
       resolve(list)
     })
   })

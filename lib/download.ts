@@ -37,11 +37,9 @@ export const downloadResource = async ({ catalogConfig, resourceId, importConfig
 
   // creation du dossier pour stocker le fichier distant
   await fs.mkdir(destinationPath.substring(0, destinationPath.lastIndexOf('/')), { recursive: true })
-  console.log('Directory created:', destinationPath.substring(0, destinationPath.lastIndexOf('/')))
 
   try {
     await ssh.getFile(destinationPath, resourceId)
-    console.log('File downloaded successfully')
     return destinationPath
   } catch (error) {
     console.error('Error downloading file:', error)
