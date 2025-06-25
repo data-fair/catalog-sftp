@@ -9,7 +9,7 @@ import { type Config, NodeSSH } from 'node-ssh'
  * This variable holds the last SFTPConfig object that was used,
  * allowing for reuse or reference in subsequent SFTP operations.
  */
-let lastConfig: SFTPConfig
+let lastConfig: SFTPConfig | undefined
 
 /**
  * Store the ssh instance for SFTP operations.
@@ -67,6 +67,7 @@ export const list = async ({ catalogConfig, params }: ListContext<SFTPConfig, ty
       await ssh.connect(paramsConnection)
     } catch (err) {
       console.error(err)
+      lastConfig = undefined
       throw new Error('Configuration invalide')
     }
     clientSFTP = await ssh.requestSFTP()
