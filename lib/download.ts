@@ -9,7 +9,7 @@ import { type Config, NodeSSH } from 'node-ssh'
  * @returns The local path to the downloaded file, or `undefined` if the download fails.
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
-export const downloadResource = async ({ catalogConfig, resourceId, importConfig, tmpDir }: DownloadResourceContext<SFTPConfig>) => {
+export const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }: DownloadResourceContext<SFTPConfig>) => {
   const ssh = new NodeSSH()
 
   const paramsConnection: Config = {
@@ -18,9 +18,9 @@ export const downloadResource = async ({ catalogConfig, resourceId, importConfig
     port: catalogConfig.port
   }
   if (catalogConfig.connectionKey.key === 'sshKey') {
-    paramsConnection.privateKey = catalogConfig.connectionKey.sshKey
+    paramsConnection.privateKey = secrets.sshKey
   } else if (catalogConfig.connectionKey.key === 'password') {
-    paramsConnection.password = catalogConfig.connectionKey.password
+    paramsConnection.password = secrets.password
   } else {
     throw new Error('format non pris en charge')
   }

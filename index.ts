@@ -7,15 +7,40 @@ import capabilities from './lib/capabilities.ts'
 // This file should not contain any code, but only constants and dynamic imports of functions.
 
 const plugin: CatalogPlugin<SFTPConfig, typeof capabilities> = {
+  async prepare ({ catalogConfig, secrets }: { catalogConfig: SFTPConfig, secrets: Record<string, string> }) {
+    switch (catalogConfig.connectionKey.key) {
+      case 'sshKey':
+        if (secrets?.sshKey && catalogConfig.connectionKey.sshKey === '') {
+          delete secrets.sshKey
+        } else {
+          secrets.sshKey = catalogConfig.connectionKey.sshKey
+          catalogConfig.connectionKey.sshKey = '********'
+        }
+        break
+      case 'password':
+        if (secrets?.password && catalogConfig.connectionKey.password === '') {
+          delete secrets.password
+        } else {
+          secrets.password = catalogConfig.connectionKey.password
+          catalogConfig.connectionKey.password = '********'
+        }
+        break
+      default: break
+    }
+    return {
+      catalogConfig,
+      secrets
+    }
+  },
 
   async list (context) {
     const { list } = await import('./lib/imports.ts')
     return list(context)
   },
 
-  async getResource (catalogConfig, resourceId) {
+  async getResource (context) {
     const { getResource } = await import('./lib/imports.ts')
-    return getResource(catalogConfig, resourceId)
+    return getResource(context)
   },
 
   async downloadResource (context) {

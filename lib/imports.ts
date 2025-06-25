@@ -1,7 +1,7 @@
 import type { SFTPConfig } from '#types'
 import type { SFTPWrapper } from 'ssh2'
 import type capabilities from './capabilities.ts'
-import type { ListContext, Folder, Resource } from '@data-fair/lib-common-types/catalog/index.js'
+import type { ListContext, Folder, Resource, GetResourceContext } from '@data-fair/lib-common-types/catalog/index.js'
 import { type Config, NodeSSH } from 'node-ssh'
 
 /**
@@ -10,6 +10,7 @@ import { type Config, NodeSSH } from 'node-ssh'
  * allowing for reuse or reference in subsequent SFTP operations.
  */
 let lastConfig: SFTPConfig | undefined
+let lastSecrets: Record<string, string>
 
 /**
  * Store the ssh instance for SFTP operations.
@@ -47,18 +48,21 @@ const prepareFiles = (list: any[], path: string): (Folder | Resource)[] => {
  * @returns An object containing the count of items, the list of results (folders and resources), and the path as an array of folders.
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
-export const list = async ({ catalogConfig, params }: ListContext<SFTPConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
-  if (!(lastConfig && ssh && clientSFTP) || JSON.stringify(lastConfig) !== JSON.stringify(catalogConfig)) {
+export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
+  if (!(lastConfig && ssh && clientSFTP) ||
+    JSON.stringify(lastConfig) !== JSON.stringify(catalogConfig) ||
+    JSON.stringify(lastSecrets) !== JSON.stringify(secrets)) {
     lastConfig = catalogConfig
+    lastSecrets = secrets
     const paramsConnection: Config = {
       host: catalogConfig.url,
       username: catalogConfig.login,
       port: catalogConfig.port
     }
     if (catalogConfig.connectionKey.key === 'sshKey') {
-      paramsConnection.privateKey = catalogConfig.connectionKey.sshKey
+      paramsConnection.privateKey = secrets.sshKey
     } else if (catalogConfig.connectionKey.key === 'password') {
-      paramsConnection.password = catalogConfig.connectionKey.password
+      paramsConnection.password = secrets.password
     } else {
       throw new Error('format non pris en charge')
     }
@@ -113,7 +117,7 @@ export const list = async ({ catalogConfig, params }: ListContext<SFTPConfig, ty
  * @param resourceId - The identifier (path) of the resource.
  * @returns A `Resource` object representing the file.
  */
-export const getResource = async (catalogConfig: SFTPConfig, resourceId: string): Promise<Resource> => {
+export const getResource = async ({ catalogConfig, secrets, resourceId }: GetResourceContext<SFTPConfig>): Promise<Resource> => {
   const pointPos = resourceId.lastIndexOf('.')
   return {
     id: resourceId,
