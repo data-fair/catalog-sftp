@@ -1,5 +1,5 @@
 import type { SFTPConfig } from '#types'
-import type { SFTPWrapper } from 'ssh2'
+import type { FileEntryWithStats, SFTPWrapper } from 'ssh2'
 import type capabilities from './capabilities.ts'
 import type { ListContext, Folder, Resource, GetResourceContext } from '@data-fair/lib-common-types/catalog/index.js'
 import { type Config, NodeSSH } from 'node-ssh'
@@ -28,15 +28,16 @@ let clientSFTP: SFTPWrapper
  * @param path - The current directory path.
  * @returns An array of `Folder` or `Resource` objects representing the files and folders.
  */
-const prepareFiles = (list: any[], path: string): (Folder | Resource)[] => {
-  return list.map((file) => {
+const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder | Resource)[] => {
+  return list.map((file : FileEntryWithStats) => {
     const pointPos = file.filename.lastIndexOf('.')
     return {
       id: path + '/' + file.filename,
       title: file.filename,
       type: (file.longname.charAt(0) === 'd') ? 'folder' : 'resource',
       url: path + '/' + file.filename,
-      format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1))
+      format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1)),
+      size: file.attrs.size
     }
   })
 }
@@ -77,7 +78,7 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
     clientSFTP = await ssh.requestSFTP()
   }
   const path = params.currentFolderId ?? '.'
-  const files: any[] = await new Promise((resolve, reject) => {
+  const files: FileEntryWithStats[] = await new Promise((resolve, reject) => {
     if (!clientSFTP) {
       throw new Error('Configuration invalide')
     }
