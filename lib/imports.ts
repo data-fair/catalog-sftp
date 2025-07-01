@@ -1,8 +1,10 @@
 import type { SFTPConfig } from '#types'
 import type { FileEntryWithStats, SFTPWrapper } from 'ssh2'
 import type capabilities from './capabilities.ts'
-import type { ListContext, Folder, Resource, GetResourceContext } from '@data-fair/lib-common-types/catalog/index.js'
+import type { ListContext, Folder, CatalogPlugin } from '@data-fair/lib-common-types/catalog/index.js'
 import { type Config, NodeSSH } from 'node-ssh'
+
+type ResourceList = Awaited<ReturnType<CatalogPlugin['list']>>['results']
 
 /**
  * Stores the most recently used SFTP configuration.
@@ -26,18 +28,30 @@ let clientSFTP: SFTPWrapper
  *
  * @param list - The array of file objects returned by the SFTP `readdir` method.
  * @param path - The current directory path.
- * @returns An array of `Folder` or `Resource` objects representing the files and folders.
+ * @returns An array of `Folder` or `ResourceList` objects representing the files and folders.
  */
-const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder | Resource)[] => {
-  return list.map((file : FileEntryWithStats) => {
+const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder[] | ResourceList) => {
+  return list.map((file: FileEntryWithStats) => {
     const pointPos = file.filename.lastIndexOf('.')
-    return {
-      id: path + '/' + file.filename,
-      title: file.filename,
-      type: (file.longname.charAt(0) === 'd') ? 'folder' : 'resource',
-      url: path + '/' + file.filename,
-      format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1)),
-      size: file.attrs.size
+    if (file.longname.charAt(0) === 'd') {
+      // Folder
+      return {
+        id: path + '/' + file.filename,
+        title: file.filename,
+        type: 'folder'
+      } as Folder
+    } else {
+      // ResourceList
+      return {
+        id: path + '/' + file.filename,
+        title: file.filename,
+        description: '',
+        format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1)),
+        mimeType: '',
+        origin: path + '/' + file.filename,
+        size: file.attrs.size,
+        type: 'resource'
+      } as ResourceList[number]
     }
   })
 }
@@ -49,7 +63,7 @@ const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder | Resou
  * @returns An object containing the count of items, the list of results (folders and resources), and the path as an array of folders.
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
-export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPConfig, typeof capabilities>): Promise<{ count: number; results: (Folder | Resource)[]; path: Folder[] }> => {
+export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPConfig, typeof capabilities>): ReturnType<CatalogPlugin['list']> => {
   if (!(lastConfig && ssh && clientSFTP) ||
     JSON.stringify(lastConfig) !== JSON.stringify(catalogConfig) ||
     JSON.stringify(lastSecrets) !== JSON.stringify(secrets)) {
@@ -108,23 +122,5 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
     count: results.length,
     results,
     path: pathFolder
-  }
-}
-
-/**
- * Retrieves metadata for a specific resource (file) on the SFTP server.
- *
- * @param catalogConfig - The SFTP configuration object.
- * @param resourceId - The identifier (path) of the resource.
- * @returns A `Resource` object representing the file.
- */
-export const getResource = async ({ catalogConfig, secrets, resourceId }: GetResourceContext<SFTPConfig>): Promise<Resource> => {
-  const pointPos = resourceId.lastIndexOf('.')
-  return {
-    id: resourceId,
-    title: resourceId.substring(resourceId.lastIndexOf('/') + 1),
-    type: 'resource',
-    format: (pointPos === -1) ? '' : (resourceId.substring(pointPos + 1)),
-    url: resourceId
   }
 }

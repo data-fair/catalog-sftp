@@ -14,7 +14,6 @@ const { generateKeyPairSync } = ssh2.utils
 const catalogPlugin: CatalogPlugin = plugin as CatalogPlugin
 const list = catalogPlugin.list
 const getResource = catalogPlugin.getResource
-const downloadResource = catalogPlugin.downloadResource
 const prepare = catalogPlugin.prepare
 
 // Generate the SSH keys
@@ -184,17 +183,6 @@ describe('test the sftp catalog', () => {
   })
 
   describe('test the getResource function', () => {
-    it('should return the resource test.txt', async () => {
-      const res = await getResource({ catalogConfig, secrets, resourceId: './landing-zone/test.txt' })
-      assert.strictEqual(res?.title, 'test.txt')
-      assert.strictEqual(res?.id, './landing-zone/test.txt')
-      assert.strictEqual(res?.type, 'resource')
-      assert.strictEqual(res?.format, 'txt')
-      assert.strictEqual(res?.url, './landing-zone/test.txt')
-    })
-  })
-
-  describe('test the download function', () => {
     before(() => {
       if (!fs.existsSync('./test-it/test-dl')) {
         fs.mkdirSync('./test-it/test-dl', { recursive: true })
@@ -203,125 +191,136 @@ describe('test the sftp catalog', () => {
     beforeEach(() => fs.emptyDirSync('./test-it/test-dl'))
     after(() => fs.removeSync('./test-it/test-dl'))
 
-    it('should download the resource test.txt', async () => {
-      const res = await downloadResource({ catalogConfig, secrets, resourceId: './landing-zone/test.txt', tmpDir: './test-it/test-dl', importConfig: {} })
-      assert.ok(res, './test-it/test-dl/landing-zone/test.txt')
-      const fileExists = await fs.pathExists(res)
+    it('should return the resource test.txt', async () => {
+      const res = await getResource({
+        catalogConfig,
+        secrets,
+        resourceId: './landing-zone/test.txt',
+        importConfig: {},
+        tmpDir: './test-it/test-dl'
+      })
+      assert.ok(res)
+      assert.strictEqual(res.title, 'test.txt')
+      assert.strictEqual(res.id, './landing-zone/test.txt')
+      assert.strictEqual(res.format, 'txt')
+      assert.strictEqual(res.origin, catalogConfig.url + ':' + catalogConfig.port)
+      assert.strictEqual(res.filePath, './test-it/test-dl/test.txt')
+      const fileExists = await fs.pathExists(res.filePath)
       assert.ok(fileExists, 'The downloaded file should exist')
     })
+  })
 
-    describe('SFTP downloadResource erreur', () => {
-      invalidTestsConfigs.forEach(({ description, secret, config }) => {
-        it('downloadResource ' + description, async () => {
-          await assert.rejects(
-            async () => {
-              await downloadResource({ catalogConfig: config, secrets: secret, resourceId: './landing-zone/test.txt', tmpDir: './test-it/test-dl', importConfig: {} })
-            },
-            /Configuration invalide|Connection error/,
-            'Doit renvoyer une erreur'
-          )
-        })
-      })
-
-      it('downloadResource should throw an error with an invalid resourceId', async () => {
+  describe('SFTP getResource erreur', () => {
+    invalidTestsConfigs.forEach(({ description, secret, config }) => {
+      it('getResource ' + description, async () => {
         await assert.rejects(
           async () => {
-            await downloadResource({ catalogConfig, secrets, resourceId: './landing-zone/something-wrong', tmpDir: './test-it/test-dl', importConfig: {} })
+            await getResource({ catalogConfig: config, secrets: secret, resourceId: './landing-zone/test.txt', tmpDir: './test-it/test-dl', importConfig: {} })
           },
-          /No such file/,
+          /Configuration invalide|Connection error/,
           'Doit renvoyer une erreur'
         )
       })
     })
+
+    it('getResource should throw an error with an invalid resourceId', async () => {
+      await assert.rejects(
+        async () => {
+          await getResource({ catalogConfig, secrets, resourceId: './landing-zone/something-wrong', tmpDir: './test-it/test-dl', importConfig: {} })
+        },
+        /No such file/,
+        'Doit renvoyer une erreur'
+      )
+    })
+  })
+})
+
+describe('prepare', () => {
+  it('should mask sshKey and set secret when sshKey is provided', async () => {
+    const catalogConfig: SFTPConfig = {
+      url: 'localhost',
+      port: 22,
+      login: 'user',
+      connectionKey: {
+        sshKey: 'PRIVATE_KEY',
+        key: 'sshKey'
+      }
+    }
+    const secrets: Record<string, string> = {}
+
+    const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+      catalogConfig: deepClone(catalogConfig),
+      secrets,
+      capabilities: []
+    })
+
+    assert.strictEqual((newConfig as SFTPConfig).connectionKey.sshKey, '********')
+    assert.strictEqual(newSecrets?.sshKey, 'PRIVATE_KEY')
   })
 
-  describe('prepare', () => {
-    it('should mask sshKey and set secret when sshKey is provided', async () => {
-      const catalogConfig: SFTPConfig = {
-        url: 'localhost',
-        port: 22,
-        login: 'user',
-        connectionKey: {
-          sshKey: 'PRIVATE_KEY',
-          key: 'sshKey'
-        }
+  it('should remove sshKey from secrets if sshKey is empty', async () => {
+    const catalogConfig: SFTPConfig = {
+      url: 'localhost',
+      port: 22,
+      login: 'user',
+      connectionKey: {
+        sshKey: '',
+        key: 'sshKey'
       }
-      const secrets: Record<string, string> = {}
+    }
+    const secrets: Record<string, string> = { sshKey: 'PRIVATE_KEY' }
 
-      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
-        catalogConfig: deepClone(catalogConfig),
-        secrets,
-        capabilities: []
-      })
-
-      assert.strictEqual((newConfig as SFTPConfig).connectionKey.sshKey, '********')
-      assert.strictEqual(newSecrets?.sshKey, 'PRIVATE_KEY')
+    const { secrets: newSecrets } = await prepare({
+      catalogConfig: deepClone(catalogConfig),
+      secrets,
+      capabilities: []
     })
 
-    it('should remove sshKey from secrets if sshKey is empty', async () => {
-      const catalogConfig: SFTPConfig = {
-        url: 'localhost',
-        port: 22,
-        login: 'user',
-        connectionKey: {
-          sshKey: '',
-          key: 'sshKey'
-        }
+    assert.ok(newSecrets && !('sshKey' in newSecrets))
+  })
+
+  it('should mask password and set secret when password is provided', async () => {
+    const catalogConfig: SFTPConfig = {
+      url: 'localhost',
+      port: 22,
+      login: 'user',
+      connectionKey: {
+        password: 'mypassword',
+        key: 'password'
       }
-      const secrets: Record<string, string> = { sshKey: 'PRIVATE_KEY' }
+    }
+    const secrets: Record<string, string> = {}
 
-      const { secrets: newSecrets } = await prepare({
-        catalogConfig: deepClone(catalogConfig),
-        secrets,
-        capabilities: []
-      })
-
-      assert.ok(newSecrets && !('sshKey' in newSecrets))
+    const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+      catalogConfig: deepClone(catalogConfig),
+      secrets,
+      capabilities: []
     })
 
-    it('should mask password and set secret when password is provided', async () => {
-      const catalogConfig: SFTPConfig = {
-        url: 'localhost',
-        port: 22,
-        login: 'user',
-        connectionKey: {
-          password: 'mypassword',
-          key: 'password'
-        }
+    assert.ok(newConfig, 'newConfig should not be undefined')
+    assert.strictEqual((newConfig as SFTPConfig).connectionKey.password, '********')
+    assert.strictEqual(newSecrets?.password, 'mypassword')
+  })
+
+  it('should remove password from secrets if password is empty', async () => {
+    const catalogConfig: SFTPConfig = {
+      url: 'localhost',
+      port: 22,
+      login: 'user',
+      connectionKey: {
+        password: '',
+        key: 'password'
       }
-      const secrets: Record<string, string> = {}
+    }
+    const secrets: Record<string, string> = { password: 'mypassword' }
 
-      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
-        catalogConfig: deepClone(catalogConfig),
-        secrets,
-        capabilities: []
-      })
-
-      assert.ok(newConfig, 'newConfig should not be undefined')
-      assert.strictEqual((newConfig as SFTPConfig).connectionKey.password, '********')
-      assert.strictEqual(newSecrets?.password, 'mypassword')
+    const { secrets: newSecrets } = await prepare({
+      catalogConfig: deepClone(catalogConfig),
+      secrets,
+      capabilities: []
     })
 
-    it('should remove password from secrets if password is empty', async () => {
-      const catalogConfig: SFTPConfig = {
-        url: 'localhost',
-        port: 22,
-        login: 'user',
-        connectionKey: {
-          password: '',
-          key: 'password'
-        }
-      }
-      const secrets: Record<string, string> = { password: 'mypassword' }
-
-      const { secrets: newSecrets } = await prepare({
-        catalogConfig: deepClone(catalogConfig),
-        secrets,
-        capabilities: []
-      })
-
-      assert.ok(newSecrets && !('password' in newSecrets))
-    })
+    assert.ok(newSecrets && !('password' in newSecrets))
   })
 })
 
