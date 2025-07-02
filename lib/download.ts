@@ -1,5 +1,5 @@
 import type { SFTPConfig } from '#types'
-import type { CatalogPlugin, GetResourceContext, Resource } from '@data-fair/lib-common-types/catalog/index.js'
+import type { CatalogPlugin, GetResourceContext, Resource } from '@data-fair/types-catalogs'
 import { type Config, NodeSSH } from 'node-ssh'
 
 /**

@@ -1,7 +1,7 @@
 import type { SFTPConfig } from '#types'
 import type { FileEntryWithStats, SFTPWrapper } from 'ssh2'
 import type capabilities from './capabilities.ts'
-import type { ListContext, Folder, CatalogPlugin } from '@data-fair/lib-common-types/catalog/index.js'
+import type { ListContext, Folder, CatalogPlugin } from '@data-fair/types-catalogs'
 import { type Config, NodeSSH } from 'node-ssh'
 
 type ResourceList = Awaited<ReturnType<CatalogPlugin['list']>>['results']

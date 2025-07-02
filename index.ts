@@ -1,4 +1,4 @@
-import type { CatalogPlugin } from '@data-fair/lib-common-types/catalog/index.js'
+import type { CatalogPlugin } from '@data-fair/types-catalogs'
 import { type SFTPConfig, configSchema, assertConfigValid } from '#types'
 import capabilities from './lib/capabilities.ts'
 

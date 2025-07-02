@@ -1,6 +1,6 @@
 import type { SFTPConfig } from '#types'
 import plugin from '../index.ts'
-import type { CatalogPlugin } from '@data-fair/lib-common-types/catalog/index.js'
+import type { CatalogPlugin } from '@data-fair/types-catalogs'
 import { strict as assert } from 'node:assert'
 import { describe, it, before, after, beforeEach } from 'node:test'
 import fs from 'fs-extra'
