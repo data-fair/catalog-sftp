@@ -1,19 +1,10 @@
 {
   "$id": "https://github.com/data-fair/catalog-sftp/catalog-config",
-  "x-exports": [
-    "types",
-    "validate",
-    "schema"
-  ],
+  "x-exports": ["types", "validate", "schema"],
   "title": "SFTPConfig",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "url",
-    "port",
-    "connectionKey",
-    "login"
-  ],
+  "required": ["url", "port", "connectionKey", "login"],
   "properties": {
     "url": {
       "type": "string",
@@ -22,9 +13,7 @@
       "x-i18n-description": {
         "fr": "L'adresse de l'hôte du catalogue (veuillez vous référez à la documentation technique du catalogue)"
       },
-      "examples": [
-        "exemple-d-hote.fr"
-      ]
+      "examples": ["exemple-d-hote.fr"]
     },
     "port": {
       "type": "integer",
@@ -48,20 +37,24 @@
       "title": "Mode de connexion",
       "description": "Le mode de connexion à utiliser (Mot de passe, clé SSH)",
       "oneOfLayout": {
-        "label": "Chosir un mode de connexion"
+        "label": "Choisir un mode de connexion"
       },
       "oneOf": [
         {
           "title": "Mot de Passe",
-          "required": [
-            "password"
-          ],
+          "required": ["password"],
           "properties": {
             "password": {
               "type": "string",
               "description": "Enter your account password for the remote server",
               "x-i18n-description": {
                 "fr": "Renseigner le mot de passe associé à votre compte sur le serveur distant"
+              },
+              "layout": {
+                "props": {
+                  "type": "password",
+                  "autocomplete": "new-password"
+                }
               }
             },
             "key": {
@@ -71,9 +64,7 @@
         },
         {
           "title": "Clé SHH",
-          "required": [
-            "sshKey"
-          ],
+          "required": ["sshKey"],
           "properties": {
             "key": {
               "const": "sshKey"
