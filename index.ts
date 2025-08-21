@@ -1,36 +1,15 @@
 import type { CatalogPlugin } from '@data-fair/types-catalogs'
 import { type SFTPConfig, configSchema, assertConfigValid } from '#types'
-import capabilities from './lib/capabilities.ts'
+import capabilities, { type SFTPCapabilities } from './lib/capabilities.ts'
 
 // Since the plugin is very frequently imported, each function is imported on demand,
 // instead of loading the entire plugin.
 // This file should not contain any code, but only constants and dynamic imports of functions.
 
-const plugin: CatalogPlugin<SFTPConfig, typeof capabilities> = {
-  async prepare ({ catalogConfig, secrets }: { catalogConfig: SFTPConfig, secrets: Record<string, string> }) {
-    switch (catalogConfig.connectionKey.key) {
-      case 'sshKey':
-        if (secrets?.sshKey && catalogConfig.connectionKey.sshKey === '') {
-          delete secrets.sshKey
-        } else {
-          secrets.sshKey = catalogConfig.connectionKey.sshKey
-          catalogConfig.connectionKey.sshKey = '********'
-        }
-        break
-      case 'password':
-        if (secrets?.password && catalogConfig.connectionKey.password === '') {
-          delete secrets.password
-        } else {
-          secrets.password = catalogConfig.connectionKey.password
-          catalogConfig.connectionKey.password = '********'
-        }
-        break
-      default: break
-    }
-    return {
-      catalogConfig,
-      secrets
-    }
+const plugin: CatalogPlugin<SFTPConfig, SFTPCapabilities> = {
+  async prepare (context) {
+    const prepare = (await import('./lib/prepare.ts')).default
+    return prepare(context)
   },
 
   async list (context) {

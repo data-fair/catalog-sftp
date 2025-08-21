@@ -203,7 +203,6 @@ describe('test the sftp catalog', () => {
       assert.strictEqual(res.title, 'test.txt')
       assert.strictEqual(res.id, './landing-zone/test.txt')
       assert.strictEqual(res.format, 'txt')
-      assert.strictEqual(res.origin, catalogConfig.url + ':' + catalogConfig.port)
       assert.strictEqual(res.filePath, './test-it/test-dl/test.txt')
       const fileExists = await fs.pathExists(res.filePath)
       assert.ok(fileExists, 'The downloaded file should exist')
@@ -233,97 +232,66 @@ describe('test the sftp catalog', () => {
       )
     })
   })
+
+  describe('prepare', () => {
+    it('should mask sshKey and set secret when sshKey is provided', async () => {
+      const catalogConfig: SFTPConfig = {
+        url: 'localhost',
+        port: 31022,
+        login: 'test3',
+        connectionKey: {
+          sshKey: keysUser.private,
+          key: 'sshKey'
+        }
+      }
+      const secrets: Record<string, string> = {}
+
+      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+        catalogConfig: deepClone(catalogConfig),
+        secrets,
+        capabilities: []
+      })
+
+      assert.strictEqual((newConfig as SFTPConfig).connectionKey.sshKey, '********')
+      assert.strictEqual(newSecrets?.sshKey, keysUser.private)
+    })
+
+    it('should mask password and set secret when password is provided', async () => {
+      const catalogConfig: SFTPConfig = {
+        url: 'localhost',
+        port: 31022,
+        login: 'test3',
+        connectionKey: {
+          password: '12345',
+          key: 'password'
+        }
+      }
+      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+        catalogConfig: deepClone(catalogConfig),
+        secrets,
+        capabilities: []
+      })
+
+      assert.ok(newConfig, 'newConfig should not be undefined')
+      assert.strictEqual((newConfig as SFTPConfig).connectionKey.password, '********')
+      assert.strictEqual(newSecrets?.password, '12345')
+    })
+
+    it('should throw an error with invalid config', async () => {
+      await assert.rejects(async () => {
+        await prepare({
+          catalogConfig: {
+            ...deepClone(catalogConfig),
+            url: 'invalid-url'
+          },
+          secrets: {},
+          capabilities: []
+        })
+      }, /Connection test failed/, 'Doit renvoyer une erreur')
+    })
+  })
+
+  function deepClone<T> (obj: T): T {
+    return JSON.parse(JSON.stringify(obj))
+  }
 })
-
-describe('prepare', () => {
-  it('should mask sshKey and set secret when sshKey is provided', async () => {
-    const catalogConfig: SFTPConfig = {
-      url: 'localhost',
-      port: 22,
-      login: 'user',
-      connectionKey: {
-        sshKey: 'PRIVATE_KEY',
-        key: 'sshKey'
-      }
-    }
-    const secrets: Record<string, string> = {}
-
-    const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
-      catalogConfig: deepClone(catalogConfig),
-      secrets,
-      capabilities: []
-    })
-
-    assert.strictEqual((newConfig as SFTPConfig).connectionKey.sshKey, '********')
-    assert.strictEqual(newSecrets?.sshKey, 'PRIVATE_KEY')
-  })
-
-  it('should remove sshKey from secrets if sshKey is empty', async () => {
-    const catalogConfig: SFTPConfig = {
-      url: 'localhost',
-      port: 22,
-      login: 'user',
-      connectionKey: {
-        sshKey: '',
-        key: 'sshKey'
-      }
-    }
-    const secrets: Record<string, string> = { sshKey: 'PRIVATE_KEY' }
-
-    const { secrets: newSecrets } = await prepare({
-      catalogConfig: deepClone(catalogConfig),
-      secrets,
-      capabilities: []
-    })
-
-    assert.ok(newSecrets && !('sshKey' in newSecrets))
-  })
-
-  it('should mask password and set secret when password is provided', async () => {
-    const catalogConfig: SFTPConfig = {
-      url: 'localhost',
-      port: 22,
-      login: 'user',
-      connectionKey: {
-        password: 'mypassword',
-        key: 'password'
-      }
-    }
-    const secrets: Record<string, string> = {}
-
-    const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
-      catalogConfig: deepClone(catalogConfig),
-      secrets,
-      capabilities: []
-    })
-
-    assert.ok(newConfig, 'newConfig should not be undefined')
-    assert.strictEqual((newConfig as SFTPConfig).connectionKey.password, '********')
-    assert.strictEqual(newSecrets?.password, 'mypassword')
-  })
-
-  it('should remove password from secrets if password is empty', async () => {
-    const catalogConfig: SFTPConfig = {
-      url: 'localhost',
-      port: 22,
-      login: 'user',
-      connectionKey: {
-        password: '',
-        key: 'password'
-      }
-    }
-    const secrets: Record<string, string> = { password: 'mypassword' }
-
-    const { secrets: newSecrets } = await prepare({
-      catalogConfig: deepClone(catalogConfig),
-      secrets,
-      capabilities: []
-    })
-
-    assert.ok(newSecrets && !('password' in newSecrets))
-  })
-})
-
-function deepClone<T> (obj: T): T {
-  return JSON.parse(JSON.stringify(obj))
-}

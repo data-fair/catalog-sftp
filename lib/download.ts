@@ -21,7 +21,6 @@ export const getMetaData = async ({ catalogConfig, resourceId }: GetResourceCont
     id: resourceId,
     title: resourceId.substring(resourceId.lastIndexOf('/') + 1),
     format: (pointPos === -1) ? '' : (resourceId.substring(pointPos + 1)),
-    origin: catalogConfig.url + ':' + catalogConfig.port,
     filePath: ''
   }
 }
