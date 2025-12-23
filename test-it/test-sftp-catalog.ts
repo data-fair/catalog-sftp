@@ -1,25 +1,27 @@
 import type { SFTPConfig } from '#types'
-import plugin from '../index.ts'
 import type { CatalogPlugin } from '@data-fair/types-catalogs'
+
 import { strict as assert } from 'node:assert'
 import { describe, it, before, after, beforeEach } from 'node:test'
+import { logFunctions } from './test-utils.ts'
+
 import fs from 'fs-extra'
 import util from 'util'
 import ssh2 from 'ssh2'
 import { exec as execCallback } from 'child_process'
 
+// Import plugin and use default type like it's done in Catalogs
+import plugin from '../index.ts'
+const catalogPlugin: CatalogPlugin = plugin as CatalogPlugin
+
 const exec = util.promisify(execCallback)
 const { generateKeyPairSync } = ssh2.utils
-
-const catalogPlugin: CatalogPlugin = plugin as CatalogPlugin
-const list = catalogPlugin.list
-const getResource = catalogPlugin.getResource
-const prepare = catalogPlugin.prepare
 
 // Generate the SSH keys
 const keysUser = generateKeyPairSync('ed25519')
 const keysHost = generateKeyPairSync('ed25519')
 
+/** Mock catalog configuration for testing purposes. */
 const catalogConfig: SFTPConfig = {
   url: 'localhost',
   port: 31022,
@@ -30,11 +32,18 @@ const catalogConfig: SFTPConfig = {
   }
 }
 
-const secrets: Record<string, string> = {
-  sshKey: keysUser.private
+const secrets = { sshKey: keysUser.private }
+
+const getResourceDefaultConfig = {
+  catalogConfig,
+  secrets,
+  importConfig: { },
+  update: { metadata: true, schema: true },
+  tmpDir: './test-it/test-dl',
+  log: logFunctions
 }
 
-// conditions de tests
+// Configurations invalides pour les tests d'erreur
 const invalidTestsConfigs: { description: string, config: SFTPConfig, secret: Record<string, string> }[] = [
   {
     description: 'should throw an error with an invalid url',
@@ -104,6 +113,7 @@ const invalidTestsConfigs: { description: string, config: SFTPConfig, secret: Re
 ]
 
 describe('test the sftp catalog', () => {
+  // Démarrage et initialisation du serveur SFTP avant les tests
   before(async () => {
     try {
       if (!fs.existsSync('./test-it/config/user_keys')) {
@@ -125,24 +135,25 @@ describe('test the sftp catalog', () => {
       // Temps d'attente pour permettre au conteneur de vraiment se lancer
       await new Promise(resolve => setTimeout(resolve, 5000))
     } catch (err) {
-      console.error('Erreur pendant le demarrage :', err)
+      console.error('Erreur pendant le démarrage :', err)
       throw err
     }
   })
 
+  // Arrêt du serveur SFTP après les tests
   after(async () => {
     try {
       const { stdout, stderr } = await exec('docker compose down', { cwd: './test-it' })
       console.log(stdout)
       console.error(stderr)
     } catch (err) {
-      console.error('Erreur pendant l\'arret', err)
+      console.error("Erreur pendant l'arrêt", err)
     }
   })
 
   describe('test the list function', () => {
     it('should list resources and folder from landing-zone', async () => {
-      const res = await list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone' } })
+      const res = await catalogPlugin.list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone' } })
       assert.strictEqual(res.count, res.results.length, 'la taille des resultats et du compte ne correspondent pas')
       assert.strictEqual(res.count, 3)
       assert.strictEqual(res.path.length, 1)
@@ -157,7 +168,7 @@ describe('test the sftp catalog', () => {
     })
 
     it('should list resources and folder from a sub-folder', async () => {
-      const res = await list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone/donnees' } })
+      const res = await catalogPlugin.list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone/donnees' } })
       assert.strictEqual(res.count, res.results.length, 'la taille des resultats et du compte ne correspondent pas')
       assert.strictEqual(res.count, 2)
       assert.strictEqual(res.path.length, 2)
@@ -172,7 +183,11 @@ describe('test the sftp catalog', () => {
         it('list ' + description, async () => {
           await assert.rejects(
             async () => {
-              await list({ catalogConfig: config, secrets: secret, params: { currentFolderId: './' } })
+              await catalogPlugin.list({
+                catalogConfig: config,
+                secrets: secret,
+                params: { currentFolderId: './' }
+              })
             },
             /Configuration invalide|Connection error/,
             'Doit renvoyer une erreur'
@@ -192,12 +207,9 @@ describe('test the sftp catalog', () => {
     after(() => fs.removeSync('./test-it/test-dl'))
 
     it('should return the resource test.txt', async () => {
-      const res = await getResource({
-        catalogConfig,
-        secrets,
+      const res = await catalogPlugin.getResource({
+        ...getResourceDefaultConfig,
         resourceId: './landing-zone/test.txt',
-        importConfig: {},
-        tmpDir: './test-it/test-dl'
       })
       assert.ok(res)
       assert.strictEqual(res.title, 'test.txt')
@@ -214,7 +226,12 @@ describe('test the sftp catalog', () => {
       it('getResource ' + description, async () => {
         await assert.rejects(
           async () => {
-            await getResource({ catalogConfig: config, secrets: secret, resourceId: './landing-zone/test.txt', tmpDir: './test-it/test-dl', importConfig: {} })
+            await catalogPlugin.getResource({
+              ...getResourceDefaultConfig,
+              catalogConfig: config,
+              secrets: secret,
+              resourceId: './landing-zone/test.txt'
+            })
           },
           /Configuration invalide|Connection error/,
           'Doit renvoyer une erreur'
@@ -225,7 +242,10 @@ describe('test the sftp catalog', () => {
     it('getResource should throw an error with an invalid resourceId', async () => {
       await assert.rejects(
         async () => {
-          await getResource({ catalogConfig, secrets, resourceId: './landing-zone/something-wrong', tmpDir: './test-it/test-dl', importConfig: {} })
+          await catalogPlugin.getResource({
+            ...getResourceDefaultConfig,
+            resourceId: './landing-zone/something-wrong'
+          })
         },
         /No such file/,
         'Doit renvoyer une erreur'
@@ -246,7 +266,7 @@ describe('test the sftp catalog', () => {
       }
       const secrets: Record<string, string> = {}
 
-      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+      const { catalogConfig: newConfig, secrets: newSecrets } = await catalogPlugin.prepare({
         catalogConfig: deepClone(catalogConfig),
         secrets,
         capabilities: []
@@ -266,7 +286,7 @@ describe('test the sftp catalog', () => {
           key: 'password'
         }
       }
-      const { catalogConfig: newConfig, secrets: newSecrets } = await prepare({
+      const { catalogConfig: newConfig, secrets: newSecrets } = await catalogPlugin.prepare({
         catalogConfig: deepClone(catalogConfig),
         secrets,
         capabilities: []
@@ -279,7 +299,7 @@ describe('test the sftp catalog', () => {
 
     it('should throw an error with invalid config', async () => {
       await assert.rejects(async () => {
-        await prepare({
+        await catalogPlugin.prepare({
           catalogConfig: {
             ...deepClone(catalogConfig),
             url: 'invalid-url'

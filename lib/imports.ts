@@ -21,18 +21,20 @@ const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder[] | Res
       return {
         id: path + '/' + file.filename,
         title: file.filename,
-        type: 'folder'
+        type: 'folder',
+        updatedAt: file.attrs.mtime ? new Date(file.attrs.mtime * 1000) : undefined
       } as Folder
     } else {
       // ResourceList
       return {
         id: path + '/' + file.filename,
         title: file.filename,
+        type: 'resource',
         description: '',
         format: (pointPos === -1) ? '' : (file.filename.substring(pointPos + 1)),
         mimeType: '',
         size: file.attrs.size,
-        type: 'resource'
+        updatedAt: file.attrs.mtime ? new Date(file.attrs.mtime * 1000) : undefined
       } as ResourceList[number]
     }
   })
