@@ -1,6 +1,6 @@
-import type { CatalogPlugin } from '@data-fair/types-catalogs'
+import type CatalogPlugin from '@data-fair/types-catalogs'
 import { type SFTPConfig, configSchema, assertConfigValid } from '#types'
-import capabilities, { type SFTPCapabilities } from './lib/capabilities.ts'
+import { type SFTPCapabilities, capabilities } from './lib/capabilities.ts'
 
 // Since the plugin is very frequently imported, each function is imported on demand,
 // instead of loading the entire plugin.
@@ -23,8 +23,7 @@ const plugin: CatalogPlugin<SFTPConfig, SFTPCapabilities> = {
   },
 
   metadata: {
-    title: 'Catalog SFTP',
-    description: 'SFTP plugin for Data Fair Catalog',
+    title: 'SFTP',
     capabilities
   },
   configSchema,
