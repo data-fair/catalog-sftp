@@ -38,7 +38,7 @@ export default async ({ catalogConfig, secrets }: PrepareContext<SFTPConfig, SFT
     } else if (catalogConfig.connectionKey.key === 'password') {
       paramsConnection.password = secrets.password
     } else {
-      throw new Error('format non pris en charge')
+      throw new Error('Unsupported connection format')
     }
 
     const ssh = new NodeSSH()

@@ -58,7 +58,7 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
   } else if (catalogConfig.connectionKey.key === 'password') {
     paramsConnection.password = secrets.password
   } else {
-    throw new Error('format non pris en charge')
+    throw new Error('Unsupported connection format')
   }
 
   const ssh = new NodeSSH()
@@ -67,14 +67,14 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
     await ssh.connect(paramsConnection)
   } catch (err) {
     console.error(err)
-    throw new Error('Configuration invalide')
+    throw new Error('Invalid configuration')
   }
   const clientSFTP = await ssh.requestSFTP()
 
   const path = params.currentFolderId ?? '.'
   const files: FileEntryWithStats[] = await new Promise((resolve, reject) => {
     if (!clientSFTP) {
-      throw new Error('Configuration invalide (clientSFTP manquant)')
+      throw new Error('Invalid configuration (clientSFTP missing)')
     }
     clientSFTP.readdir(path, (err: any, list: any) => {
       if (err) {

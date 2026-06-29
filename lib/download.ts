@@ -45,20 +45,20 @@ const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }:G
   } else if (catalogConfig.connectionKey.key === 'password') {
     paramsConnection.password = secrets.password
   } else {
-    throw new Error('format non pris en charge')
+    throw new Error('Unsupported connection format')
   }
 
   try {
     await ssh.connect(paramsConnection)
   } catch (err) {
-    throw new Error('Configuration invalide')
+    throw new Error('Invalid configuration')
   }
 
   // const fs = await import('node:fs/promises')
   resourceId = resourceId.substring(resourceId.indexOf('./') + 2)
   const destinationPath = tmpDir + '/' + resourceId.substring(resourceId.lastIndexOf('/') + 1)
 
-  // creation du dossier pour stocker le fichier distant
+  // create the folder to store the remote file
   // await fs.mkdir(destinationPath.substring(0, destinationPath.lastIndexOf('/')), { recursive: true })
 
   try {

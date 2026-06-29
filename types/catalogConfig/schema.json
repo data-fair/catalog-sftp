@@ -8,17 +8,20 @@
   "properties": {
     "url": {
       "type": "string",
-      "title": "Adresse de l'hôte",
-      "description": "The host adress",
+      "title": "Host Address",
+      "x-i18n-title": {
+        "fr": "Adresse de l'hôte"
+      },
+      "description": "The host address",
       "x-i18n-description": {
-        "fr": "L'adresse de l'hôte du catalogue (veuillez vous référez à la documentation technique du catalogue)"
+        "fr": "L'adresse de l'hôte du catalogue (veuillez vous référer à la documentation technique du catalogue)"
       },
       "examples": ["exemple-d-hote.fr"]
     },
     "port": {
       "type": "integer",
-      "title": "port",
-      "description": "The port of the catalog",
+      "title": "Port",
+      "description": "The catalog API port",
       "x-i18n-description": {
         "fr": "Le port de l'API du catalogue (veuillez vous référez à la documentation technique du catalogue)"
       },
@@ -26,29 +29,49 @@
     },
     "login": {
       "type": "string",
-      "title": "Identifiant",
-      "description": "The user login",
+      "title": "Login / Username",
+      "x-i18n-title": {
+        "fr": "Identifiant / Nom d'utilisateur"
+      },
+      "description": "The login or username used to access the catalog",
       "x-i18n-description": {
-        "fr": "L'identifiant (login) utilisé pour accéder au catalogue"
+        "fr": "L'identifiant (login ou nom d'utilisateur) utilisé pour accéder au catalogue"
       }
     },
     "connectionKey": {
       "type": "object",
-      "title": "Mode de connexion",
-      "description": "Le mode de connexion à utiliser (Mot de passe, clé SSH)",
+      "title": "Connection Mode",
+      "x-i18n-title": {
+        "fr": "Mode de connexion"
+      },
+      "description": "The connection mode to use (password or SSH key)",
+      "x-i18n-description": {
+        "fr": "Le mode de connexion à utiliser (mot de passe ou clé SSH)"
+      },
       "oneOfLayout": {
-        "label": "Choisir un mode de connexion"
+        "label": "Choose a connection mode",
+        "x-i18n-label": {
+          "fr": "Choisir un mode de connexion"
+        }
       },
       "oneOf": [
         {
-          "title": "Mot de Passe",
+          "title": "Password",
+          "x-i18n-title": {
+            "fr": "Mot de passe"
+          },
           "required": ["password"],
           "properties": {
+            "key": { "const": "password" },
             "password": {
+              "title": "Password",
+              "x-i18n-title": {
+                "fr": "Mot de passe"
+              },
               "type": "string",
               "description": "Enter your account password for the remote server",
               "x-i18n-description": {
-                "fr": "Renseigner le mot de passe associé à votre compte sur le serveur distant"
+                "fr": "Renseignez le mot de passe associé à votre compte sur le serveur distant"
               },
               "layout": {
                 "props": {
@@ -56,25 +79,27 @@
                   "autocomplete": "suppress"
                 }
               }
-            },
-            "key": {
-              "const": "password"
             }
           }
         },
         {
-          "title": "Clé SHH",
+          "title": "SSH Key",
+          "x-i18n-title": {
+            "fr": "Clé SSH"
+          },
           "required": ["sshKey"],
           "properties": {
-            "key": {
-              "const": "sshKey"
-            },
+            "key": { "const": "sshKey" },
             "sshKey": {
               "type": "string",
+              "title": "SSH Private Key",
+              "x-i18n-title": {
+                "fr": "Clé SSH privée"
+              },
               "layout": "textarea",
-              "description": "Enter your ssh key",
+              "description": "Enter your SSH private key",
               "x-i18n-description": {
-                "fr": "Renseigner le votre clé SSH privée"
+                "fr": "Renseignez votre clé SSH privée"
               }
             }
           }
