@@ -31,6 +31,8 @@ services:
       - ./config/ssh_host_keys:/etc/ssh/keys:ro
       # Montage de tout le répertoire contenant les clés publiques des utilisateurs
       - ./config/user_keys:/home/test3/.ssh/keys:ro
+      # Désactive la pénalité par IP d'OpenSSH, que nos tests d'erreur déclenchent
+      - ./config/disable-penalties.sh:/etc/sftp.d/disable-penalties.sh:ro
 
       # RSA + ed25519 pour couvrir plus de clés ssh 
 
