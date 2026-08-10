@@ -189,7 +189,7 @@ describe('test the sftp catalog', () => {
                 params: { currentFolderId: './' }
               })
             },
-            /Configuration invalide|Connection error/,
+            /Invalid configuration/,
             'Doit renvoyer une erreur'
           )
         })
@@ -233,7 +233,7 @@ describe('test the sftp catalog', () => {
               resourceId: './landing-zone/test.txt'
             })
           },
-          /Configuration invalide|Connection error/,
+          /Invalid configuration/,
           'Doit renvoyer une erreur'
         )
       })
