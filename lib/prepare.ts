@@ -42,8 +42,11 @@ export default async ({ catalogConfig, secrets }: PrepareContext<SFTPConfig, SFT
     }
 
     const ssh = new NodeSSH()
-    await ssh.connect(paramsConnection)
-    ssh.dispose()
+    try {
+      await ssh.connect(paramsConnection)
+    } finally {
+      ssh.dispose()
+    }
   } catch (error) {
     console.error('Connection test failed:', error)
     throw new Error('Connection test failed', { cause: error })

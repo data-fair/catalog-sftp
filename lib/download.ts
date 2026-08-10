@@ -51,6 +51,7 @@ const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }:G
   try {
     await ssh.connect(paramsConnection)
   } catch (err) {
+    ssh.dispose()
     throw new Error('Invalid configuration')
   }
 
@@ -61,11 +62,15 @@ const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }:G
   // create the folder to store the remote file
   // await fs.mkdir(destinationPath.substring(0, destinationPath.lastIndexOf('/')), { recursive: true })
 
+  // the plugin runs inside the long lived catalogs worker: an undisposed
+  // connection keeps an sshd session alive on the server until the pod restarts
   try {
     await ssh.getFile(destinationPath, resourceId)
     return destinationPath
   } catch (error) {
     console.error('Error downloading file:', error)
     throw error
+  } finally {
+    ssh.dispose()
   }
 }

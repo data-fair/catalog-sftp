@@ -67,40 +67,48 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
     await ssh.connect(paramsConnection)
   } catch (err) {
     console.error(err)
+    ssh.dispose()
     throw new Error('Invalid configuration')
   }
-  const clientSFTP = await ssh.requestSFTP()
 
-  const path = params.currentFolderId ?? '.'
-  const files: FileEntryWithStats[] = await new Promise((resolve, reject) => {
-    if (!clientSFTP) {
-      throw new Error('Invalid configuration (clientSFTP missing)')
-    }
-    clientSFTP.readdir(path, (err: any, list: any) => {
-      if (err) {
-        console.error('Error reading directory:', err)
-        return reject(err)
+  // the plugin runs inside the long lived catalogs process: an undisposed
+  // connection keeps an sshd session alive on the server until the pod restarts
+  try {
+    const clientSFTP = await ssh.requestSFTP()
+
+    const path = params.currentFolderId ?? '.'
+    const files: FileEntryWithStats[] = await new Promise((resolve, reject) => {
+      if (!clientSFTP) {
+        throw new Error('Invalid configuration (clientSFTP missing)')
       }
-      resolve(list)
+      clientSFTP.readdir(path, (err: any, list: any) => {
+        if (err) {
+          console.error('Error reading directory:', err)
+          return reject(err)
+        }
+        resolve(list)
+      })
     })
-  })
 
-  const results = prepareFiles(files, path)
+    const results = prepareFiles(files, path)
 
-  const pathFolder: Folder[] = []
-  let parentId: string | undefined = (params.currentFolderId?.indexOf('./')) === -1 ? params.currentFolderId : params.currentFolderId?.substring(params.currentFolderId.indexOf('./') + 2)
-  while (parentId && parentId !== '') {
-    pathFolder.unshift({
-      id: parentId,
-      title: parentId.substring(parentId.lastIndexOf('/') + 1),
-      type: 'folder'
-    })
-    parentId = parentId.substring(0, parentId.lastIndexOf('/'))
-  }
+    const pathFolder: Folder[] = []
+    let parentId: string | undefined = (params.currentFolderId?.indexOf('./')) === -1 ? params.currentFolderId : params.currentFolderId?.substring(params.currentFolderId.indexOf('./') + 2)
+    while (parentId && parentId !== '') {
+      pathFolder.unshift({
+        id: parentId,
+        title: parentId.substring(parentId.lastIndexOf('/') + 1),
+        type: 'folder'
+      })
+      parentId = parentId.substring(0, parentId.lastIndexOf('/'))
+    }
 
-  return {
-    count: results.length,
-    results,
-    path: pathFolder
+    return {
+      count: results.length,
+      results,
+      path: pathFolder
+    }
+  } finally {
+    ssh.dispose()
   }
 }
