@@ -2,6 +2,7 @@ import type { SFTPConfig } from '#types'
 import type { PrepareContext } from '@data-fair/types-catalogs'
 import type { SFTPCapabilities } from './capabilities.ts'
 import { type Config, NodeSSH } from 'node-ssh'
+import { resolvePublicAddress } from '@data-fair/lib-node/ssrf.js'
 
 export default async ({ catalogConfig, secrets }: PrepareContext<SFTPConfig, SFTPCapabilities>) => {
   switch (catalogConfig.connectionKey.key) {
@@ -43,7 +44,9 @@ export default async ({ catalogConfig, secrets }: PrepareContext<SFTPConfig, SFT
 
     const ssh = new NodeSSH()
     try {
-      await ssh.connect(paramsConnection)
+      // the host is chosen by the user: refuse non public addresses (SSRF) and connect to
+      // the checked IP, resolving the host again could give another address (DNS rebinding)
+      await ssh.connect({ ...paramsConnection, host: await resolvePublicAddress(catalogConfig.url) })
     } finally {
       ssh.dispose()
     }

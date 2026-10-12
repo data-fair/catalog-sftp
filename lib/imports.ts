@@ -3,6 +3,7 @@ import type { FileEntryWithStats } from 'ssh2'
 import type capabilities from './capabilities.ts'
 import type { ListContext, Folder, CatalogPlugin } from '@data-fair/types-catalogs'
 import { type Config, NodeSSH } from 'node-ssh'
+import { resolvePublicAddress } from '@data-fair/lib-node/ssrf.js'
 
 type ResourceList = Awaited<ReturnType<CatalogPlugin['list']>>['results']
 
@@ -64,11 +65,13 @@ export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPC
   const ssh = new NodeSSH()
 
   try {
-    await ssh.connect(paramsConnection)
+    // the host is chosen by the user: refuse non public addresses (SSRF) and connect to
+    // the checked IP, resolving the host again could give another address (DNS rebinding)
+    await ssh.connect({ ...paramsConnection, host: await resolvePublicAddress(catalogConfig.url) })
   } catch (err) {
     console.error(err)
     ssh.dispose()
-    throw new Error('Invalid configuration')
+    throw new Error('Invalid configuration', { cause: err })
   }
 
   // the plugin runs inside the long lived catalogs process: an undisposed

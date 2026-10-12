@@ -1,6 +1,7 @@
 import type { SFTPConfig } from '#types'
 import type { CatalogPlugin, GetResourceContext, Resource } from '@data-fair/types-catalogs'
 import { type Config, NodeSSH } from 'node-ssh'
+import { resolvePublicAddress } from '@data-fair/lib-node/ssrf.js'
 
 /**
  * Download localy a specific resource from a SFTP server, and retrieves the metadata with the filepath of the downloaded file.
@@ -49,10 +50,12 @@ const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }:G
   }
 
   try {
-    await ssh.connect(paramsConnection)
+    // the host is chosen by the user: refuse non public addresses (SSRF) and connect to
+    // the checked IP, resolving the host again could give another address (DNS rebinding)
+    await ssh.connect({ ...paramsConnection, host: await resolvePublicAddress(catalogConfig.url) })
   } catch (err) {
     ssh.dispose()
-    throw new Error('Invalid configuration')
+    throw new Error('Invalid configuration', { cause: err })
   }
 
   // const fs = await import('node:fs/promises')
