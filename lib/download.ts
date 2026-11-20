@@ -1,7 +1,7 @@
 import type { SFTPConfig } from '#types'
 import type { CatalogPlugin, GetResourceContext, Resource } from '@data-fair/types-catalogs'
-import { type Config, NodeSSH } from 'node-ssh'
-import { resolvePublicAddress } from '@data-fair/lib-node/ssrf.js'
+import type { NodeSSH } from 'node-ssh'
+import { connect } from './connect.ts'
 
 /**
  * Download localy a specific resource from a SFTP server, and retrieves the metadata with the filepath of the downloaded file.
@@ -34,27 +34,10 @@ export const getMetaData = async ({ catalogConfig, resourceId }: GetResourceCont
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
 const downloadResource = async ({ catalogConfig, resourceId, secrets, tmpDir }:GetResourceContext<SFTPConfig>) => {
-  const ssh = new NodeSSH()
-
-  const paramsConnection: Config = {
-    host: catalogConfig.url,
-    username: catalogConfig.login,
-    port: catalogConfig.port
-  }
-  if (catalogConfig.connectionKey.key === 'sshKey') {
-    paramsConnection.privateKey = secrets.sshKey
-  } else if (catalogConfig.connectionKey.key === 'password') {
-    paramsConnection.password = secrets.password
-  } else {
-    throw new Error('Unsupported connection format')
-  }
-
+  let ssh: NodeSSH
   try {
-    // the host is chosen by the user: refuse non public addresses (SSRF) and connect to
-    // the checked IP, resolving the host again could give another address (DNS rebinding)
-    await ssh.connect({ ...paramsConnection, host: await resolvePublicAddress(catalogConfig.url) })
+    ssh = await connect(catalogConfig, secrets)
   } catch (err) {
-    ssh.dispose()
     throw new Error('Invalid configuration', { cause: err })
   }
 

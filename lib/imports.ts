@@ -2,8 +2,8 @@ import type { SFTPConfig } from '#types'
 import type { FileEntryWithStats } from 'ssh2'
 import type capabilities from './capabilities.ts'
 import type { ListContext, Folder, CatalogPlugin } from '@data-fair/types-catalogs'
-import { type Config, NodeSSH } from 'node-ssh'
-import { resolvePublicAddress } from '@data-fair/lib-node/ssrf.js'
+import type { NodeSSH } from 'node-ssh'
+import { connect } from './connect.ts'
 
 type ResourceList = Awaited<ReturnType<CatalogPlugin['list']>>['results']
 
@@ -49,28 +49,11 @@ const prepareFiles = (list: FileEntryWithStats[], path: string): (Folder[] | Res
  * @throws Will throw an error if the connection configuration is invalid or not supported.
  */
 export const list = async ({ catalogConfig, secrets, params }: ListContext<SFTPConfig, typeof capabilities>): ReturnType<CatalogPlugin['list']> => {
-  const paramsConnection: Config = {
-    host: catalogConfig.url,
-    username: catalogConfig.login,
-    port: catalogConfig.port
-  }
-  if (catalogConfig.connectionKey.key === 'sshKey') {
-    paramsConnection.privateKey = secrets.sshKey
-  } else if (catalogConfig.connectionKey.key === 'password') {
-    paramsConnection.password = secrets.password
-  } else {
-    throw new Error('Unsupported connection format')
-  }
-
-  const ssh = new NodeSSH()
-
+  let ssh: NodeSSH
   try {
-    // the host is chosen by the user: refuse non public addresses (SSRF) and connect to
-    // the checked IP, resolving the host again could give another address (DNS rebinding)
-    await ssh.connect({ ...paramsConnection, host: await resolvePublicAddress(catalogConfig.url) })
+    ssh = await connect(catalogConfig, secrets)
   } catch (err) {
     console.error(err)
-    ssh.dispose()
     throw new Error('Invalid configuration', { cause: err })
   }
 

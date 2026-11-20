@@ -253,6 +253,69 @@ describe('test the sftp catalog', () => {
     })
   })
 
+  describe('connection reset by the server', () => {
+    const resetSocket = (client: any) => {
+      client._sock.destroy(Object.assign(new Error('read ECONNRESET'), { code: 'ECONNRESET', errno: -104, syscall: 'read' }))
+    }
+    const patchClient = (method: 'sftp' | 'end') => {
+      const original = (ssh2.Client.prototype as any)[method]
+      ;(ssh2.Client.prototype as any)[method] = function (this: any, ...args: any[]) {
+        const res = original.apply(this, args)
+        resetSocket(this)
+        return res
+      }
+      return () => { (ssh2.Client.prototype as any)[method] = original }
+    }
+
+    it('list rejects when the connection is reset during the listing', async () => {
+      const restore = patchClient('sftp')
+      try {
+        await assert.rejects(catalogPlugin.list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone' } }))
+      } finally {
+        restore()
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    })
+
+    it('list survives a reset after the connection is disposed', async () => {
+      const restore = patchClient('end')
+      try {
+        const res = await catalogPlugin.list({ catalogConfig, secrets, params: { currentFolderId: './landing-zone' } })
+        assert.strictEqual(res.count, 3)
+      } finally {
+        restore()
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    })
+
+    it('getResource survives a reset after the connection is disposed', async () => {
+      fs.ensureDirSync('./test-it/test-dl')
+      const restore = patchClient('end')
+      try {
+        const res = await catalogPlugin.getResource({ ...getResourceDefaultConfig, resourceId: './landing-zone/test.txt' })
+        assert.strictEqual(res.title, 'test.txt')
+      } finally {
+        restore()
+        fs.removeSync('./test-it/test-dl')
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    })
+
+    it('prepare survives a reset after the connection is disposed', async () => {
+      const restore = patchClient('end')
+      try {
+        await catalogPlugin.prepare({
+          catalogConfig: { ...deepClone(catalogConfig), connectionKey: { key: 'sshKey', sshKey: keysUser.private } },
+          secrets: {},
+          capabilities: []
+        })
+      } finally {
+        restore()
+      }
+      await new Promise(resolve => setTimeout(resolve, 200))
+    })
+  })
+
   describe('prepare', () => {
     it('should mask sshKey and set secret when sshKey is provided', async () => {
       const catalogConfig: SFTPConfig = {
